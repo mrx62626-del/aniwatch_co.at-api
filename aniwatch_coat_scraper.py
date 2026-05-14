@@ -444,45 +444,44 @@ class AniwatchAPI:
                 anime_name = re.sub(r"\s+English\s+(Sub|Dub).*$", "", anime_name).strip()
                 
                 poster = ""
-               
+
                 try:
-                    post_html = self.session.get(link, timeout=10).text
                
-                    poster = ""
-                  
-                    try:
-                        headers = {
-                            "User-Agent": "Mozilla/5.0",
-                            "Referer": "https://aniwatch.co.at/"
-                        }
-                        
-                        post_html = self.session.get(
-                            link,
-                            headers=headers,
-                            timeout=10
-                        ).text
-                        
-                        matches = re.findall(
-                            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+                    headers = {
+                        "User-Agent": "Mozilla/5.0",
+                        "Referer": "https://aniwatch.co.at/"
+                    }
+               
+                    post_html = self.session.get(
+                        link,
+                        headers=headers,
+                        timeout=10
+                    ).text
+               
+                    # First try data-src
+                    img_match = re.search(
+                        r'<img[^>]+data-src=["\']([^"\']+)["\']',
+                        post_html,
+                        re.I
+                    )
+               
+                    if img_match:
+                        poster = img_match.group(1)
+               
+                    # fallback to src
+                    if not poster:
+               
+                        img_match = re.search(
+                            r'<img[^>]+src=["\']([^"\']+)["\']',
                             post_html,
                             re.I
                         )
-                  
-                        # Pick first non-favicon image
-                        for img in matches:
-                  
-                            img = img.strip()
-                  
-                            if (
-                                "favicon" not in img.lower()
-                                and "cropped" not in img.lower()
-                                and "logo" not in img.lower()
-                            ):
-                                poster = img
-                                break
-                  
-                    except Exception:
-                        pass
+               
+                        if img_match:
+                            poster = img_match.group(1)
+               
+                except Exception:
+                    pass
                
                     if img_match:
                         poster = img_match.group(1)
