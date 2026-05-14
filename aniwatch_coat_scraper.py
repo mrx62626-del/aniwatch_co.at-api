@@ -474,33 +474,45 @@ class AniwatchAPI:
 
                     html = anime_resp.text
 
-                    # Find poster image
-                    img_match = re.search(
-                        r'<img[^>]+data-src=["\']([^"\']+)["\']',
+                    # Find actual anime poster container first
+                    poster_match = re.search(
+                        r'class=["\'][^"\']*film-poster-img[^"\']*["\'][^>]+(?:data-src|src)=["\']([^"\']+)["\']',
                         html,
                         re.I
                     )
 
-                    if img_match:
-                        poster = img_match.group(1)
+                    if poster_match:
+                        poster = poster_match.group(1)
 
-                    # fallback to src=
+                    # fallback 1
                     if not poster:
-                        img_match = re.search(
-                            r'<img[^>]+src=["\']([^"\']+)["\']',
+                        poster_match = re.search(
+                            r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\'][^>]+class=["\'][^"\']*film-poster-img',
                             html,
                             re.I
                         )
-                        if img_match:
-                            poster = img_match.group(1)
 
-                    # ignore logos/favicons
-                    if poster and (
-                        "favicon" in poster.lower()
-                        or "cropped" in poster.lower()
-                        or "logo" in poster.lower()
-                    ):
-                        poster = ""
+                        if poster_match:
+                            poster = poster_match.group(1)
+
+                    # fallback 2
+                    if not poster:
+                        matches = re.findall(
+                            r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\']',
+                            html,
+                            re.I
+                        )
+
+                        for img in matches:
+                            lower = img.lower()
+                            if (
+                                "favicon" not in lower
+                                and "logo" not in lower
+                                and "cropped" not in lower
+                                and ("wp-content/uploads" in lower or ".jpg" in lower or ".png" in lower)
+                            ):
+                                poster = img
+                                break
 
                 except Exception as e:
                     print(f"Poster error: {e}")
