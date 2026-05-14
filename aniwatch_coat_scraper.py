@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Aniwatch.co.at Complete API Scraper
 ==================================
@@ -16,7 +17,6 @@ Flow:
 """
 
 import re
-import html
 import base64
 import json
 import requests
@@ -98,80 +98,6 @@ class AniwatchAPI:
         slug = re.sub(r"\s+", "-", slug)
         slug = re.sub(r"-+", "-", slug)
         return slug.strip("-")
-
-    def get_anilist_poster(self, title: str) -> str:
-        """Fetch poster from AniList"""
-        try:
-            query = """
-            query ($search: String) {
-              Media(search: $search, type: ANIME) {
-                coverImage {
-                  large
-                }
-              }
-            }
-            """
-
-            clean_title = html.unescape(title)
-            
-            clean_title = re.sub(r'[!?.,:;]+', '', clean_title)
-            
-            clean_title = clean_title.replace("’", "'")
-            
-            variables = {
-                "search": clean_title
-            }
-            response = self.session.post(
-                "https://graphql.anilist.co",
-                json={
-                    "query": query,
-                    "variables": variables
-                },
-                timeout=15
-            )
-            data = response.json()
-            poster = (
-                data
-                .get("data", {})
-                .get("Media", {})
-                .get("coverImage", {})
-                .get("large", "")
-            )
-            
-            # fallback title cleanup
-            if not poster:
-            
-                fallback_title = clean_title
-
-                if "," in fallback_title:
-                    fallback_title = fallback_title.split(",")[0].strip()
-            
-                variables = {
-                    "search": fallback_title
-                }
-            
-                response = self.session.post(
-                    "https://graphql.anilist.co",
-                    json={
-                        "query": query,
-                        "variables": variables
-                    },
-                    timeout=15
-                )
-            
-                data = response.json()
-            
-                poster = (
-                    data
-                    .get("data", {})
-                    .get("Media", {})
-                    .get("coverImage", {})
-                    .get("large", "")
-                )
-            
-            return poster
-        except Exception:
-            return ""
     
     def get_anime_info(self, slug: str) -> Dict[str, Any]:
         """Get anime details from anime page"""
@@ -500,62 +426,111 @@ class AniwatchAPI:
     
     def get_home(self) -> Dict[str, Any]:
         """Get homepage data - recent anime"""
+   
         try:
+   
             resp = self.session.get(
                 f"{REST_API}/posts",
-                params={"per_page": 20},
+                params={
+                    "per_page": 20,
+                    "_embed": 1
+                },
                 timeout=30
             )
-
+   
             if resp.status_code != 200:
                 return {
                     "success": False,
                     "error": f"Status {resp.status_code}"
                 }
-
+   
             posts = resp.json()
+   
             results = []
-
+   
             for post in posts:
+   
                 title = post.get("title", {}).get("rendered", "")
+   
                 link = post.get("link", "")
-
+   
                 if " Episode " in title:
                     anime_name = title.split(" Episode ")[0]
                 else:
                     anime_name = title
-
+   
                 anime_name = re.sub(
                     r"\s+English\s+(Sub|Dub).*$",
                     "",
                     anime_name
                 ).strip()
-
-                poster = self.get_anilist_poster(anime_name)
-
+   
+                poster = ""
+   
+                try:
+   
+                    media = (
+                        post
+                        .get("_embedded", {})
+                        .get("wp:featuredmedia", [])
+                    )
+   
+                    if media:
+   
+                        media = media[0]
+   
+                        sizes = (
+                            media
+                            .get("media_details", {})
+                            .get("sizes", {})
+                        )
+   
+                        if "medium" in sizes:
+   
+                            poster = sizes["medium"]["source_url"]
+   
+                        elif "full" in sizes:
+   
+                            poster = sizes["full"]["source_url"]
+   
+                        else:
+   
+                            poster = media.get("source_url", "")
+   
+                        lower = poster.lower()
+   
+                        # ignore favicon/logo junk
+                        if (
+                            "favicon" in lower
+                            or "cropped" in lower
+                            or "logo" in lower
+                        ):
+   
+                            poster = ""
+   
+                except Exception:
+                    pass
+   
                 results.append({
                     "title": anime_name,
                     "link": link,
                     "slug": self._title_to_slug(anime_name),
                     "poster": poster
                 })
-
+   
             return {
                 "success": True,
                 "anime": results,
                 "page": 1
             }
-
+   
         except Exception as e:
+   
             return {
                 "success": False,
                 "error": str(e)
             }
     
-    def get_movies(self, page: int = 1) -> Dict[str, Any]:
-        """Placeholder for get_movies"""
-        return self.get_home()
-
     def get_ova(self, page: int = 1) -> Dict[str, Any]:
         """Get OVA anime"""
         try:
@@ -729,6 +704,7 @@ def create_app():
             "version": "2.0",
             "source": "aniwatch.co.at",
             "endpoints": {
+                # Core
                 "/": "API Index",
                 "/search?keyword=...": "Search anime",
                 "/info/<slug>": "Get anime info",
@@ -736,6 +712,7 @@ def create_app():
                 "/sources?episode_link=...": "Get video sources",
                 "/stream?url=...": "Get m3u8 stream",
                 "/extract?slug=&episode=": "Extract all data",
+                # Lists
                 "/home": "Home page",
                 "/movies": "Anime movies",
                 "/ova": "OVA series",
@@ -777,23 +754,30 @@ def create_app():
     
     @app.route('/episodes/<slug>')
     def episodes(slug):
+        # Get anime info first to get title
         info = api.get_anime_info(slug)
         if not info.get("success"):
             return jsonify(info), 400
         
+        # Extract title from full title
         full_title = info.get("title", "")
         anime_title = full_title.split(" - ")[0].strip() if " - " in full_title else full_title
+        
+        # Get episodes from REST API
         return jsonify(api.get_episodes(anime_title))
     
     @app.route('/sources')
     def sources():
+        # By episode_link
         episode_link = request.args.get('episode_link', '')
         if episode_link:
             return jsonify(api.get_episode_sources(episode_link))
         
+        # By episode_id
         episode_id = request.args.get('episode_id', '')
         nonce = request.args.get('nonce', '')
-        if episode_id:
+        if episode_id and nonce:
+            # Call AJAX directly
             return jsonify(api.get_episode_sources_by_id(episode_id, nonce))
         
         return jsonify({"error": "episode_link or episode_id+nonce required"}), 400
@@ -809,8 +793,10 @@ def create_app():
             return jsonify({"error": "url required"}), 400
         return jsonify(api.get_stream_url(url))
     
+    # List endpoints
     @app.route('/home')
     def home():
+        page = int(request.args.get('page', 1))
         return jsonify(api.get_home())
     
     @app.route('/movies')
@@ -929,16 +915,21 @@ def create_app():
     @app.route('/extract')
     def extract():
         """Main extract endpoint"""
+        import re
+        import json as json_lib
+        
         slug = request.args.get('slug', '')
         episode = int(request.args.get('episode', 1))
         
         if not slug:
             return jsonify({"error": "slug required"}), 400
         
+        # Get anime info
         info = api.get_anime_info(slug)
         if not info.get("success"):
             return jsonify(info), 400
         
+        # Try getting specific episode - first check recent episodes from page
         episodes = info.get("recent_episodes", [])
         target_ep = None
         for ep in episodes:
@@ -946,6 +937,7 @@ def create_app():
                 target_ep = ep
                 break
         
+        # If not found in recent, try REST API
         if not target_ep:
             full_title = info.get("title", "")
             anime_title = full_title.split(" - ")[0].strip() if " - " in full_title else full_title
@@ -956,8 +948,12 @@ def create_app():
                     break
         
         if not target_ep:
-            return jsonify({"success": False, "error": f"Episode {episode} not found"}), 404
+            return jsonify({
+                "success": False,
+                "error": f"Episode {episode} not found"
+            }), 404
         
+        # Get sources
         sources = api.get_episode_sources(target_ep["link"])
         if not sources.get("success"):
             return jsonify(sources), 400
@@ -966,18 +962,24 @@ def create_app():
         if not servers:
             return jsonify({"success": False, "error": "No servers"}), 404
         
+        # Get m3u8 from first server (includes tracks from getSources API)
         stream = api.get_stream_url(servers[0]["url"])
         master_m3u8 = stream.get("m3u8_url", "")
         subtitle_tracks = stream.get("tracks", [])
         
+        # Extract all quality variants from master m3u8
         qualities = []
         if master_m3u8 and not master_m3u8.endswith(".mp4"):
             try:
+                # Try to get master m3u8 and parse qualities
                 master_resp = api.session.get(master_m3u8, timeout=10, headers={"Referer": "https://megaplay.buzz/"})
                 if master_resp.status_code == 200:
                     master_content = master_resp.text
+                    # Find all quality variant m3u8s
                     variant_matches = re.findall(r'(https?://[^\s"<>]+\.m3u8[^\s"<>]*)', master_content)
+                    # Also parse BANDWIDTH values
                     bandwidth_matches = re.findall(r'#EXT-X-STREAM-INF:[^\n]+BANDWIDTH=(\d+)', master_content)
+                    # Parse RESOLUTION for accurate heights
                     resolution_matches = re.findall(r'RESOLUTION=(\d+)x(\d+)', master_content)
                     
                     for i, url in enumerate(variant_matches):
@@ -985,7 +987,8 @@ def create_app():
                         if i < len(resolution_matches):
                             height = int(resolution_matches[i][1])
                         elif i < len(bandwidth_matches):
-                            height = int(bandwidth_matches[i]) // 1000
+                            bw = int(bandwidth_matches[i])
+                            height = bw // 1000
                         
                         height_match = re.search(r'(\d+)p', url)
                         if height_match:
@@ -1034,111 +1037,139 @@ def create_app():
 # ========== STANDALONE FUNCTIONS ==========
 
 def search_anime(keyword: str, limit: int = 10):
+    """Standalone search function"""
     api = AniwatchAPI()
     return api.search(keyword, limit)
 
 def get_anime_info(slug: str):
+    """Standalone get anime info"""
     api = AniwatchAPI()
     return api.get_anime_info(slug)
 
 def get_episodes(anime_title: str):
+    """Standalone get episodes"""
     api = AniwatchAPI()
     return api.get_episodes(anime_title)
 
 def get_episode_sources(episode_link: str):
+    """Standalone get sources"""
     api = AniwatchAPI()
     return api.get_episode_sources(episode_link)
 
 def get_stream_url(stream_url: str):
+    """Standalone get stream"""
     api = AniwatchAPI()
     return api.get_stream_url(stream_url)
 
 def get_home():
+    """Standalone get home"""
     api = AniwatchAPI()
     return api.get_home()
 
 def get_movies(page=1):
+    """Standalone get movies"""
     api = AniwatchAPI()
     return api.get_movies(page)
 
 def get_ova(page=1):
+    """Standalone get OVA"""
     api = AniwatchAPI()
     return api.get_ova(page)
 
 def get_most_popular(page=1):
+    """Standalone get most popular"""
     api = AniwatchAPI()
     return api.get_most_popular(page)
 
 def get_top_airing(page=1):
+    """Standalone get top airing"""
     api = AniwatchAPI()
     return api.get_top_airing(page)
 
 def get_recently_updated(page=1):
+    """Standalone get recently updated"""
     api = AniwatchAPI()
     return api.get_recently_updated(page)
 
 def get_az_list(letter="all", page=1):
+    """Standalone get A-Z list"""
     api = AniwatchAPI()
     return api.get_az_list(letter, page)
 
 def get_genres():
+    """Standalone get genres"""
     api = AniwatchAPI()
     return api.get_genres()
 
 def get_by_genre(genre, page=1):
+    """Standalone get by genre"""
     api = AniwatchAPI()
     return api.get_by_genre(genre, page)
 
 def get_random_anime():
+    """Standalone get random anime"""
     api = AniwatchAPI()
     return api.get_random_anime()
 
 def get_schedules():
+    """Standalone get schedules"""
     api = AniwatchAPI()
     return api.get_schedules()
 
 def get_filter_options():
+    """Standalone get filter options"""
     api = AniwatchAPI()
     return api.get_filter_options()
 
 def get_most_favorite(page=1):
+    """Standalone get most favorite"""
     api = AniwatchAPI()
     return api.get_most_favorite(page)
 
 def get_completed(page=1):
+    """Standalone get completed"""
     api = AniwatchAPI()
     return api.get_completed(page)
 
 def get_top_upcoming(page=1):
+    """Standalone get top upcoming"""
     api = AniwatchAPI()
     return api.get_top_upcoming(page)
 
 def get_subbed_anime(page=1):
+    """Standalone get subbed anime"""
     api = AniwatchAPI()
     return api.get_subbed_anime(page)
 
 def get_dubbed_anime(page=1):
+    """Standalone get dubbed anime"""
     api = AniwatchAPI()
     return api.get_dubbed_anime(page)
 
 def get_ona(page=1):
+    """Standalone get ona"""
     api = AniwatchAPI()
     return api.get_ona(page)
 
 def get_specials(page=1):
+    """Standalone get specials"""
     api = AniwatchAPI()
     return api.get_specials(page)
 
 def get_by_producer(producer, page=1):
+    """Standalone get by producer"""
     api = AniwatchAPI()
     return api.get_by_producer(producer, page)
 
 def get_suggestions(keyword):
+    """Standalone get suggestions"""
     api = AniwatchAPI()
     return api.get_suggestions(keyword)
 
 def extract_anime(slug: str, episode: int = 1):
+    """Standalone extract all data"""
     api = AniwatchAPI()
+    
     info = api.get_anime_info(slug)
     if not info.get("success"):
         return info
