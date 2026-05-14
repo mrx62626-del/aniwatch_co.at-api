@@ -141,7 +141,10 @@ class AniwatchAPI:
             # fallback title cleanup
             if not poster:
             
-                fallback_title = clean_title.split(",")[0].strip()
+                fallback_title = clean_title
+
+               if "," in fallback_title:
+                   fallback_title = fallback_title.split(",")[0].strip()
             
                 variables = {
                     "search": fallback_title
