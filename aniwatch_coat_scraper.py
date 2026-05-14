@@ -16,6 +16,7 @@ Flow:
 """
 
 import re
+import html
 import base64
 import json
 import requests
@@ -110,8 +111,15 @@ class AniwatchAPI:
               }
             }
             """
+
+            clean_title = html.unescape(title)
+            
+            clean_title = re.sub(r'[!?.,:;]+', '', clean_title)
+            
+            clean_title = clean_title.replace("’", "'")
+            
             variables = {
-                "search": title
+                "search": clean_title
             }
             response = self.session.post(
                 "https://graphql.anilist.co",
