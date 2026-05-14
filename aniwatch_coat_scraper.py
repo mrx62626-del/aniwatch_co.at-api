@@ -448,10 +448,32 @@ class AniwatchAPI:
                 try:
                     post_html = self.session.get(link, timeout=10).text
                
-                    img_match = re.search(
-                        r'og:image"[^>]+content="([^"]+)',
-                        post_html
-                    )
+                    poster = ""
+                  
+                    try:
+                        post_html = self.session.get(link, timeout=10).text
+                  
+                        # Find ALL og:image tags
+                        matches = re.findall(
+                            r'property="og:image"\s+content="([^"]+)"',
+                            post_html
+                        )
+                  
+                        # Pick first non-favicon image
+                        for img in matches:
+                  
+                            img = img.strip()
+                  
+                            if (
+                                "favicon" not in img.lower()
+                                and "cropped" not in img.lower()
+                                and "logo" not in img.lower()
+                            ):
+                                poster = img
+                                break
+                  
+                    except Exception:
+                        pass
                
                     if img_match:
                         poster = img_match.group(1)
