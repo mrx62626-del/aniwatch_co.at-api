@@ -451,12 +451,21 @@ class AniwatchAPI:
                     poster = ""
                   
                     try:
-                        post_html = self.session.get(link, timeout=10).text
-                  
-                        # Find ALL og:image tags
+                        headers = {
+                            "User-Agent": "Mozilla/5.0",
+                            "Referer": "https://aniwatch.co.at/"
+                        }
+                        
+                        post_html = self.session.get(
+                            link,
+                            headers=headers,
+                            timeout=10
+                        ).text
+                        
                         matches = re.findall(
-                            r'property="og:image"\s+content="([^"]+)"',
-                            post_html
+                            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+                            post_html,
+                            re.I
                         )
                   
                         # Pick first non-favicon image
