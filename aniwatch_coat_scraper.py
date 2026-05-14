@@ -97,6 +97,40 @@ class AniwatchAPI:
         slug = re.sub(r"\s+", "-", slug)
         slug = re.sub(r"-+", "-", slug)
         return slug.strip("-")
+
+    def get_anilist_poster(self, title: str) -> str:
+        """Fetch poster from AniList"""
+        try:
+            query = """
+            query ($search: String) {
+              Media(search: $search, type: ANIME) {
+                coverImage {
+                  large
+                }
+              }
+            }
+            """
+            variables = {
+                "search": title
+            }
+            response = self.session.post(
+                "https://graphql.anilist.co",
+                json={
+                    "query": query,
+                    "variables": variables
+                },
+                timeout=15
+            )
+            data = response.json()
+            return (
+                data
+                .get("data", {})
+                .get("Media", {})
+                .get("coverImage", {})
+                .get("large", "")
+            )
+        except Exception:
+            return ""
     
     def get_anime_info(self, slug: str) -> Dict[str, Any]:
         """Get anime details from anime page"""
@@ -456,77 +490,7 @@ class AniwatchAPI:
                     anime_name
                 ).strip()
 
-                poster = ""
-
-                try:
-                    headers = {
-                        "User-Agent": "Mozilla/5.0",
-                        "Referer": BASE_URL
-                    }
-
-                    # Open episode page
-                    episode_resp = self.session.get(
-                        link,
-                        headers=headers,
-                        timeout=15
-                    )
-
-                    episode_html = episode_resp.text
-
-                    # Find anime page URL directly
-                    anime_link_match = re.search(
-                        r'href=["\'](https://aniwatch.co.at/anime/[^"\']+)["\']',
-                        episode_html,
-                        re.I
-                    )
-
-                    if anime_link_match:
-                        anime_url = anime_link_match.group(1)
-
-                        anime_resp = self.session.get(
-                            anime_url,
-                            headers=headers,
-                            timeout=15
-                        )
-
-                        html = anime_resp.text
-
-                        # Find actual poster
-                        poster_match = re.search(
-                            r'class=["\'][^"\']*film-poster-img[^"\']*["\'][^>]+(?:data-src|src)=["\']([^"\']+)["\']',
-                            html,
-                            re.I
-                        )
-
-                        if poster_match:
-                            poster = poster_match.group(1)
-
-                        # fallback
-                        if not poster:
-                            matches = re.findall(
-                                r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\']',
-                                html,
-                                re.I
-                            )
-
-                            for img in matches:
-                                lower = img.lower()
-                                if (
-                                    "favicon" not in lower
-                                    and "logo" not in lower
-                                    and "cropped" not in lower
-                                    and (
-                                        ".jpg" in lower
-                                        or ".jpeg" in lower
-                                        or ".png" in lower
-                                        or "wp-content/uploads" in lower
-                                    )
-                                ):
-                                    poster = img
-                                    break
-
-                except Exception as e:
-                    print(f"Poster error: {e}")
+                poster = self.get_anilist_poster(anime_name)
 
                 results.append({
                     "title": anime_name,
@@ -1054,7 +1018,7 @@ def get_home():
 
 def get_movies(page=1):
     api = AniwatchAPI()
-    return api.get_home()
+    return api.get_movies(page)
 
 def get_ova(page=1):
     api = AniwatchAPI()
