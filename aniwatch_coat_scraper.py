@@ -443,10 +443,27 @@ class AniwatchAPI:
                     anime_name = title
                 anime_name = re.sub(r"\s+English\s+(Sub|Dub).*$", "", anime_name).strip()
                 
+                poster = ""
+               
+                try:
+                    post_html = self.session.get(link, timeout=10).text
+               
+                    img_match = re.search(
+                        r'og:image"[^>]+content="([^"]+)',
+                        post_html
+                    )
+               
+                    if img_match:
+                        poster = img_match.group(1)
+               
+                except:
+                    pass
+               
                 results.append({
                     "title": anime_name,
                     "link": link,
-                    "slug": self._title_to_slug(anime_name)
+                    "slug": self._title_to_slug(anime_name),
+                    "poster": poster
                 })
             
             return {"success": True, "anime": results, "page": 1}
