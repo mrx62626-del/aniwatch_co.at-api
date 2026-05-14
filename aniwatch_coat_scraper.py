@@ -459,7 +459,7 @@ class AniwatchAPI:
     def get_home(self) -> Dict[str, Any]:
         """Get homepage data - recent anime"""
         try:
-            resp = self.session.get(f"{BASE_URL}/home", timeout=30)
+            resp = self.session.get(BASE_URL, timeout=30)
             if resp.status_code != 200:
                 return {"success": False, "error": f"Status {resp.status_code}"}
             html_content = resp.text
@@ -532,7 +532,7 @@ class AniwatchAPI:
     def get_most_popular(self, page: int = 1) -> Dict[str, Any]:
         """Get most popular anime"""
         try:
-            resp = self.session.get(f"{BASE_URL}/most-popular?page={page}", timeout=30)
+            resp = self.session.get(BASE_URL, timeout=30)
             if resp.status_code != 200:
                 return {"success": False, "error": f"Status {resp.status_code}"}
             html_content = resp.text
