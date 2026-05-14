@@ -124,8 +124,7 @@ class AniwatchAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
-    def _title_to_slug(self, title: str) -> str:
-        def get_poster_from_slug(self, slug: str):
+    def get_poster_from_slug(self, slug: str):
 
         try:
    
@@ -150,37 +149,20 @@ class AniwatchAPI:
    
         except:
             return ""
+   
+   
+    def _title_to_slug(self, title: str) -> str:
         """Convert title to URL slug"""
+   
         slug = title.lower()
+   
         slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+   
         slug = re.sub(r"\s+", "-", slug)
+   
         slug = re.sub(r"-+", "-", slug)
+   
         return slug.strip("-")
-    
-    def get_anime_info(self, slug: str) -> Dict[str, Any]:
-        """Get anime details from anime page"""
-        try:
-            url = f"{BASE_URL}/anime/{slug}/"
-            resp = self.session.get(url, timeout=30)
-            
-            if resp.status_code != 200:
-                return {"success": False, "error": f"Status {resp.status_code}"}
-            
-            html_content = resp.text
-            
-            data = {
-                "success": True,
-                "slug": slug,
-                "title": "",
-                "image": "",
-                "description": "",
-                "episode_nonce": None,
-                "recent_episodes": []
-            }
-            
-            title_match = re.search(r"<title>([^|]+)\s*\|\s*Aniwatch", html_content, re.I)
-            if title_match:
-                data["title"] = title_match.group(1).strip()
             
             img_match = re.search(r'og:image"[^>]+content="([^"]+)', html_content)
             if img_match:
