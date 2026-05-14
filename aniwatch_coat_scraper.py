@@ -67,11 +67,13 @@ class AniwatchAPI:
             if anime_name in seen:
                 continue
             seen.add(anime_name)
+            slug = self._title_to_slug(anime_name)
+
             results.append({
                 "title": anime_name,
                 "link": link,
-                "slug": self._title_to_slug(anime_name),
-                "poster": poster
+                "slug": slug,
+                "poster": self.get_poster_from_slug(slug)
             })
         return results
 
@@ -109,10 +111,12 @@ class AniwatchAPI:
                 if anime_name and anime_name not in seen:
                     seen.add(anime_name)
                     slug = self._title_to_slug(anime_name)
+
                     results.append({
                         "title": anime_name,
+                        "link": link,
                         "slug": slug,
-                        "link": link
+                        "poster": self.get_poster_from_slug(slug)
                     })
             
             return {"success": True, "results": results[:limit]}
@@ -121,6 +125,31 @@ class AniwatchAPI:
             return {"success": False, "error": str(e)}
     
     def _title_to_slug(self, title: str) -> str:
+        def get_poster_from_slug(self, slug: str):
+
+        try:
+   
+            url = f"{BASE_URL}/anime/{slug}/"
+   
+            resp = self.session.get(url, timeout=30)
+   
+            if resp.status_code != 200:
+                return ""
+   
+            html_content = resp.text
+   
+            poster_match = re.search(
+                r'property="og:image" content="([^"]+)"',
+                html_content
+            )
+   
+            if poster_match:
+                return html.unescape(poster_match.group(1))
+   
+            return ""
+   
+        except:
+            return ""
         """Convert title to URL slug"""
         slug = title.lower()
         slug = re.sub(r"[^a-z0-9\s-]", "", slug)
@@ -504,9 +533,13 @@ class AniwatchAPI:
             for post in posts:
                 title = post.get("title", {}).get("rendered", "")
                 if "ova" in title.lower():
+                    slug = self._title_to_slug(anime_name)
+
                     results.append({
-                        "title": title,
-                        "link": post.get("link", "")
+                        "title": anime_name,
+                        "link": link,
+                        "slug": slug,
+                        "poster": self.get_poster_from_slug(slug)
                     })
             
             return {"success": True, "anime": results, "page": page}
@@ -612,9 +645,13 @@ class AniwatchAPI:
             for post in posts:
                 title = post.get("title", {}).get("rendered", "")
                 if title and title[0].upper() == letter.upper():
+                    slug = self._title_to_slug(anime_name)
+
                     results.append({
-                        "title": title,
-                        "link": post.get("link", "")
+                        "title": anime_name,
+                        "link": link,
+                        "slug": slug,
+                        "poster": self.get_poster_from_slug(slug)
                     })
             
             return {"success": True, "anime": results, "page": page, "letter": letter}
@@ -644,9 +681,13 @@ class AniwatchAPI:
             posts = resp.json()
             results = []
             for post in posts:
+                slug = self._title_to_slug(anime_name)
+
                 results.append({
-                    "title": post.get("title", {}).get("rendered", ""),
-                    "link": post.get("link", "")
+                    "title": anime_name,
+                    "link": link,
+                    "slug": slug,
+                    "poster": self.get_poster_from_slug(slug)
                 })
             
             return {"success": True, "anime": results, "page": page, "genre": genre}
