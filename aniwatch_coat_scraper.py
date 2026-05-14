@@ -425,91 +425,51 @@ class AniwatchAPI:
             return {"success": False, "error": str(e)}
     
     def get_home(self) -> Dict[str, Any]:
-        """Get homepage data - recent anime"""
+        """Get homepage data"""
    
         try:
    
             resp = self.session.get(
-                f"{REST_API}/posts",
-                params={
-                    "per_page": 20,
-                    "_embed": 1
-                },
+                BASE_URL,
                 timeout=30
             )
    
             if resp.status_code != 200:
+   
                 return {
                     "success": False,
                     "error": f"Status {resp.status_code}"
                 }
    
-            posts = resp.json()
+            html = resp.text
    
             results = []
    
-            for post in posts:
+            pattern = re.findall(
+                r'<a href="([^"]+)" class="film-poster">.*?<img[^>]+data-src="([^"]+)"[^>]+alt="([^"]+)"',
+                html,
+                re.S | re.I
+            )
    
-                title = post.get("title", {}).get("rendered", "")
+            seen = set()
    
-                link = post.get("link", "")
+            for item in pattern:
    
-                if " Episode " in title:
-                    anime_name = title.split(" Episode ")[0]
-                else:
-                    anime_name = title
+                link = item[0]
+                poster = item[1]
+                title = item[2]
    
+                # Clean title
                 anime_name = re.sub(
                     r"\s+English\s+(Sub|Dub).*$",
                     "",
-                    anime_name
+                    title
                 ).strip()
    
-                poster = ""
+                if anime_name in seen:
+                    continue
    
-                try:
-   
-                    media = (
-                        post
-                        .get("_embedded", {})
-                        .get("wp:featuredmedia", [])
-                    )
-   
-                    if media:
-   
-                        media = media[0]
-   
-                        sizes = (
-                            media
-                            .get("media_details", {})
-                            .get("sizes", {})
-                        )
-   
-                        if "medium" in sizes:
-   
-                            poster = sizes["medium"]["source_url"]
-   
-                        elif "full" in sizes:
-   
-                            poster = sizes["full"]["source_url"]
-   
-                        else:
-   
-                            poster = media.get("source_url", "")
-   
-                        lower = poster.lower()
-   
-                        # ignore favicon/logo junk
-                        if (
-                            "favicon" in lower
-                            or "cropped" in lower
-                            or "logo" in lower
-                        ):
-   
-                            poster = ""
-   
-                except Exception:
-                    pass
+                seen.add(anime_name)
    
                 results.append({
                     "title": anime_name,
@@ -522,7 +482,7 @@ class AniwatchAPI:
                 "success": True,
                 "anime": results,
                 "page": 1
-            }
+           }
    
         except Exception as e:
    
