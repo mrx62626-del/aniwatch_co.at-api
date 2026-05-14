@@ -425,109 +425,114 @@ class AniwatchAPI:
             return {"success": False, "error": str(e)}
     
     def get_home(self) -> Dict[str, Any]:
-        """Get homepage data - recent anime"""
-        try:
-            resp = self.session.get(f"{REST_API}/posts", params={"per_page": 20}, timeout=30)
-            if resp.status_code != 200:
-                return {"success": False, "error": f"Status {resp.status_code}"}
-            
-            posts = resp.json()
-            results = []
-            for post in posts:
-                title = post.get("title", {}).get("rendered", "")
-                link = post.get("link", "")
-                
-                if " Episode " in title:
-                    anime_name = title.split(" Episode ")[0]
-                else:
-                    anime_name = title
-                anime_name = re.sub(r"\s+English\s+(Sub|Dub).*$", "", anime_name).strip()
-                
-                poster = ""
+    """Get homepage data - recent anime"""
 
-                try:
-               
-                    headers = {
-                        "User-Agent": "Mozilla/5.0",
-                        "Referer": "https://aniwatch.co.at/"
-                    }
-               
-                    anime_slug = self._title_to_slug(anime_name)
+    try:
 
-                    anime_url = f"{BASE_URL}/anime/{anime_slug}/"
-                  
-                    post_html = self.session.get(
-                        anime_url,
-                        headers=headers,
-                        timeout=10
-                    ).text
-               
-                    # First try data-src
+        resp = self.session.get(
+            f"{REST_API}/posts",
+            params={"per_page": 20},
+            timeout=30
+        )
+
+        if resp.status_code != 200:
+            return {
+                "success": False,
+                "error": f"Status {resp.status_code}"
+            }
+
+        posts = resp.json()
+
+        results = []
+
+        for post in posts:
+
+            title = post.get("title", {}).get("rendered", "")
+            link = post.get("link", "")
+
+            if " Episode " in title:
+                anime_name = title.split(" Episode ")[0]
+            else:
+                anime_name = title
+
+            anime_name = re.sub(
+                r"\s+English\s+(Sub|Dub).*$",
+                "",
+                anime_name
+            ).strip()
+
+            poster = ""
+
+            try:
+
+                anime_slug = self._title_to_slug(anime_name)
+
+                anime_url = f"{BASE_URL}/anime/{anime_slug}/"
+
+                headers = {
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": BASE_URL
+                }
+
+                anime_resp = self.session.get(
+                    anime_url,
+                    headers=headers,
+                    timeout=15
+                )
+
+                html = anime_resp.text
+
+                # Find poster image
+                img_match = re.search(
+                    r'<img[^>]+data-src=["\']([^"\']+)["\']',
+                    html,
+                    re.I
+                )
+
+                if img_match:
+                    poster = img_match.group(1)
+
+                # fallback to src=
+                if not poster:
+
                     img_match = re.search(
-                        r'<img[^>]+data-src=["\']([^"\']+)["\']',
-                        post_html,
+                        r'<img[^>]+src=["\']([^"\']+)["\']',
+                        html,
                         re.I
                     )
-               
+
                     if img_match:
                         poster = img_match.group(1)
-               
-                    # fallback to src
-                    if not poster:
-               
-                        img_match = re.search(
-                            r'<img[^>]+src=["\']([^"\']+)["\']',
-                            post_html,
-                            re.I
-                        )
-               
-                        if img_match:
-                            poster = img_match.group(1)
-               
-                except Exception:
-                    pass
-               
-                    if img_match:
-                        poster = img_match.group(1)
-               
-                except:
-                    pass
-               
-                results.append({
-                    "title": anime_name,
-                    "link": link,
-                    "slug": self._title_to_slug(anime_name),
-                    "poster": poster
-                })
-            
-            return {"success": True, "anime": results, "page": 1}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def get_movies(self, page: int = 1) -> Dict[str, Any]:
-        """Get anime movies"""
-        try:
-            resp = self.session.get(
-                f"{REST_API}/posts",
-                params={"search": "movie", "per_page": 20, "page": page},
-                timeout=30
-            )
-            if resp.status_code != 200:
-                return {"success": False, "error": f"Status {resp.status_code}"}
-            
-            posts = resp.json()
-            results = []
-            for post in posts:
-                title = post.get("title", {}).get("rendered", "")
-                if "movie" in title.lower():
-                    results.append({
-                        "title": title,
-                        "link": post.get("link", "")
-                    })
-            
-            return {"success": True, "anime": results, "page": page}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+
+                # ignore logos/favicons
+                if (
+                    "favicon" in poster.lower()
+                    or "cropped" in poster.lower()
+                    or "logo" in poster.lower()
+                ):
+                    poster = ""
+
+            except Exception as e:
+                print(f"Poster error: {e}")
+
+            results.append({
+                "title": anime_name,
+                "link": link,
+                "slug": self._title_to_slug(anime_name),
+                "poster": poster
+            })
+
+        return {
+            "success": True,
+            "anime": results,
+            "page": 1
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
     
     def get_ova(self, page: int = 1) -> Dict[str, Any]:
         """Get OVA anime"""
