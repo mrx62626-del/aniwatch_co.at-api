@@ -459,35 +459,41 @@ class AniwatchAPI:
                 poster = ""
 
                 try:
-                    anime_slug = self._title_to_slug(anime_name)
-                    anime_url = f"{BASE_URL}/anime/{anime_slug}/"
                     headers = {
                         "User-Agent": "Mozilla/5.0",
                         "Referer": BASE_URL
                     }
 
-                    anime_resp = self.session.get(
-                        anime_url,
+                    # Open episode page
+                    episode_resp = self.session.get(
+                        link,
                         headers=headers,
                         timeout=15
                     )
 
-                    html = anime_resp.text
+                    episode_html = episode_resp.text
 
-                    # Find actual anime poster container first
-                    poster_match = re.search(
-                        r'class=["\'][^"\']*film-poster-img[^"\']*["\'][^>]+(?:data-src|src)=["\']([^"\']+)["\']',
-                        html,
+                    # Find anime page URL directly
+                    anime_link_match = re.search(
+                        r'href=["\'](https://aniwatch.co.at/anime/[^"\']+)["\']',
+                        episode_html,
                         re.I
                     )
 
-                    if poster_match:
-                        poster = poster_match.group(1)
+                    if anime_link_match:
+                        anime_url = anime_link_match.group(1)
 
-                    # fallback 1
-                    if not poster:
+                        anime_resp = self.session.get(
+                            anime_url,
+                            headers=headers,
+                            timeout=15
+                        )
+
+                        html = anime_resp.text
+
+                        # Find actual poster
                         poster_match = re.search(
-                            r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\'][^>]+class=["\'][^"\']*film-poster-img',
+                            r'class=["\'][^"\']*film-poster-img[^"\']*["\'][^>]+(?:data-src|src)=["\']([^"\']+)["\']',
                             html,
                             re.I
                         )
@@ -495,24 +501,29 @@ class AniwatchAPI:
                         if poster_match:
                             poster = poster_match.group(1)
 
-                    # fallback 2
-                    if not poster:
-                        matches = re.findall(
-                            r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\']',
-                            html,
-                            re.I
-                        )
+                        # fallback
+                        if not poster:
+                            matches = re.findall(
+                                r'<img[^>]+(?:data-src|src)=["\']([^"\']+)["\']',
+                                html,
+                                re.I
+                            )
 
-                        for img in matches:
-                            lower = img.lower()
-                            if (
-                                "favicon" not in lower
-                                and "logo" not in lower
-                                and "cropped" not in lower
-                                and ("wp-content/uploads" in lower or ".jpg" in lower or ".png" in lower)
-                            ):
-                                poster = img
-                                break
+                            for img in matches:
+                                lower = img.lower()
+                                if (
+                                    "favicon" not in lower
+                                    and "logo" not in lower
+                                    and "cropped" not in lower
+                                    and (
+                                        ".jpg" in lower
+                                        or ".jpeg" in lower
+                                        or ".png" in lower
+                                        or "wp-content/uploads" in lower
+                                    )
+                                ):
+                                    poster = img
+                                    break
 
                 except Exception as e:
                     print(f"Poster error: {e}")
@@ -1043,7 +1054,7 @@ def get_home():
 
 def get_movies(page=1):
     api = AniwatchAPI()
-    return api.get_movies(page)
+    return api.get_home()
 
 def get_ova(page=1):
     api = AniwatchAPI()
