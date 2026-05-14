@@ -452,8 +452,12 @@ class AniwatchAPI:
                         "Referer": "https://aniwatch.co.at/"
                     }
                
+                    anime_slug = self._title_to_slug(anime_name)
+
+                    anime_url = f"{BASE_URL}/anime/{anime_slug}/"
+                  
                     post_html = self.session.get(
-                        link,
+                        anime_url,
                         headers=headers,
                         timeout=10
                     ).text
