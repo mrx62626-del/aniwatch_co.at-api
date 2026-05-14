@@ -130,13 +130,43 @@ class AniwatchAPI:
                 timeout=15
             )
             data = response.json()
-            return (
+            poster = (
                 data
                 .get("data", {})
                 .get("Media", {})
                 .get("coverImage", {})
                 .get("large", "")
             )
+            
+            # fallback title cleanup
+            if not poster:
+            
+                fallback_title = clean_title.split(",")[0].strip()
+            
+                variables = {
+                    "search": fallback_title
+                }
+            
+                response = self.session.post(
+                    "https://graphql.anilist.co",
+                    json={
+                        "query": query,
+                        "variables": variables
+                    },
+                    timeout=15
+                )
+            
+                data = response.json()
+            
+                poster = (
+                    data
+                    .get("data", {})
+                    .get("Media", {})
+                    .get("coverImage", {})
+                    .get("large", "")
+                )
+            
+            return poster
         except Exception:
             return ""
     
