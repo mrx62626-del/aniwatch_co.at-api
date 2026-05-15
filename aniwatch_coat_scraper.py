@@ -571,8 +571,89 @@ class AniwatchAPI:
         return self.get_home()
     
     def get_most_popular(self, page: int = 1) -> Dict[str, Any]:
-        """Get most popular anime"""
-        return self.get_home()
+        """Get Most Popular anime from homepage sidebar"""
+   
+        try:
+   
+            resp = self.session.get(
+                BASE_URL,
+                timeout=30
+            )
+   
+            if resp.status_code != 200:
+                return {
+                    "success": False,
+                    "error": f"Status {resp.status_code}"
+                }
+   
+            html_content = resp.text
+   
+            section_match = re.search(
+                r'Most Popular(.*?)View more',
+                html_content,
+                re.S | re.I
+            )
+   
+            if not section_match:
+                return {
+                    "success": False,
+                    "anime": []
+                }
+   
+            section_html = section_match.group(1)
+   
+            pattern = re.findall(
+                r'<a href="([^"]+)"[^>]*title="([^"]+)".*?<img[^>]+src="([^"]+)"',
+                section_html,
+                re.S | re.I
+            )
+   
+            results = []
+   
+            seen = set()
+   
+            for item in pattern:
+   
+                link = item[0]
+   
+                title = html.unescape(item[1])
+   
+                poster = html.unescape(item[2])
+   
+                slug_match = re.search(
+                    r'/anime/([^/]+)/?',
+                    link
+                )
+   
+                slug = ""
+   
+                if slug_match:
+                    slug = slug_match.group(1)
+   
+                if title in seen:
+                    continue
+   
+                seen.add(title)
+   
+                results.append({
+                    "title": title,
+                    "slug": slug,
+                    "link": link,
+                    "poster": poster
+                })
+   
+            return {
+                "success": True,
+                "anime": results,
+                "page": page
+            }
+   
+        except Exception as e:
+   
+            return {
+                "success": False,
+                "error": str(e)
+            }
     
     def get_top_airing(self, page: int = 1) -> Dict[str, Any]:
         """Get top airing"""
