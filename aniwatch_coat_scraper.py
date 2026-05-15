@@ -94,42 +94,62 @@ class AniwatchAPI:
             return {"success": False, "error": str(e)}
     
     def _title_to_slug(self, title: str) -> str:
-            def get_poster_from_slug(self, slug: str) -> str:
-            """Get anime poster image from anime page"""
-    
-            try:
-                url = f"{BASE_URL}/anime/{slug}/"
-    
-                resp = self.session.get(
-                    url,
-                    timeout=15
-                )
-    
-                if resp.status_code != 200:
-                    return ""
-    
-                html_content = resp.text
-    
-                poster_match = re.search(
-                    r'property="og:image"[^>]+content="([^"]+)"',
-                    html_content
-                )
-    
-                if poster_match:
-                    return html.unescape(
-                        poster_match.group(1)
-                    )
-    
-                return ""
-    
-            except:
-                return ""
         """Convert title to URL slug"""
+
         slug = title.lower()
-        slug = re.sub(r"[^a-z0-9\s-]", "", slug)
-        slug = re.sub(r"\s+", "-", slug)
-        slug = re.sub(r"-+", "-", slug)
+
+        slug = re.sub(
+            r"[^a-z0-9\s-]",
+            "",
+            slug
+        )
+
+        slug = re.sub(
+            r"\s+",
+            "-",
+            slug
+        )
+
+        slug = re.sub(
+            r"-+",
+            "-",
+            slug
+        )
+
         return slug.strip("-")
+
+
+    def get_poster_from_slug(self, slug: str) -> str:
+        """Get anime poster image from anime page"""
+
+        try:
+
+            url = f"{BASE_URL}/anime/{slug}/"
+
+            resp = self.session.get(
+                url,
+                timeout=15
+            )
+
+            if resp.status_code != 200:
+                return ""
+
+            html_content = resp.text
+
+            poster_match = re.search(
+                r'property="og:image"[^>]+content="([^"]+)"',
+                html_content
+            )
+
+            if poster_match:
+                return html.unescape(
+                    poster_match.group(1)
+                )
+
+            return ""
+
+        except:
+            return ""
     
     def get_anime_info(self, slug: str) -> Dict[str, Any]:
         """Get anime details from anime page"""
