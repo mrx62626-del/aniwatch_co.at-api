@@ -163,41 +163,104 @@ class AniwatchAPI:
         slug = re.sub(r"-+", "-", slug)
    
         return slug.strip("-")
-            
-            img_match = re.search(r'og:image"[^>]+content="([^"]+)', html_content)
+
+    def get_anime_info(self, slug: str) -> Dict[str, Any]:
+        """Get anime details from anime page"""
+
+        try:
+
+            url = f"{BASE_URL}/anime/{slug}/"
+
+            resp = self.session.get(url, timeout=30)
+
+            if resp.status_code != 200:
+                return {"success": False, "error": f"Status {resp.status_code}"}
+
+            html_content = resp.text
+
+            data = {
+                "success": True,
+                "slug": slug,
+                "title": "",
+                "image": "",
+                "description": "",
+                "episode_nonce": None,
+                "recent_episodes": []
+            }
+
+            title_match = re.search(
+                r"<title>([^|]+)\s*\|\s*Aniwatch",
+                html_content,
+                re.I
+            )
+
+            if title_match:
+                data["title"] = title_match.group(1).strip()
+
+            img_match = re.search(
+                r'og:image"[^>]+content="([^"]+)',
+                html_content
+            )
+
             if img_match:
                 data["image"] = img_match.group(1)
-            
-            desc_match = re.search(r'og:description"[^>]+content="([^"]+)', html_content)
+
+            desc_match = re.search(
+                r'og:description"[^>]+content="([^"]+)',
+                html_content
+            )
+
             if desc_match:
                 data["description"] = desc_match.group(1)
-            
-            ep_nonce_match = re.search(r'hianime_ep_ajax\s*=\s*\{"ajax_url":"[^"]+","episode_nonce":"(\w+)"\}', html_content)
+
+            ep_nonce_match = re.search(
+                r'hianime_ep_ajax\s*=\s*\{"ajax_url":"[^"]+","episode_nonce":"(\w+)"\}',
+                html_content
+            )
+
             if ep_nonce_match:
                 data["episode_nonce"] = ep_nonce_match.group(1)
-            
+
             ep_links = re.findall(
                 r'href="(https?://aniwatch\.co\.at/[^"]+-episode-\d+-english-subbed/)"',
                 html_content
             )
-            
+
             ep_num_list = []
+
             episodes = []
+
             for link in list(set(ep_links[:100])):
+
                 ep_match = re.search(r"-episode-(\d+)-", link)
+
                 if ep_match:
+
                     ep_num = int(ep_match.group(1))
+
                     if ep_num not in ep_num_list:
+
                         ep_num_list.append(ep_num)
-                        episodes.append({"number": ep_num, "link": link})
-            
-            data["recent_episodes"] = sorted(episodes, key=lambda x: x["number"])
-            
+
+                        episodes.append({
+                            "number": ep_num,
+                            "link": link
+                        })
+
+            data["recent_episodes"] = sorted(
+                episodes,
+                key=lambda x: x["number"]
+            )
+
             return data
-            
+
         except Exception as e:
-            return {"success": False, "error": str(e)}
-    
+
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
     def get_episodes(self, anime_title: str) -> Dict[str, Any]:
         """Get episode list for anime from REST API (max 100 recent episodes)"""
         try:
@@ -514,7 +577,9 @@ class AniwatchAPI:
             results = []
             for post in posts:
                 title = post.get("title", {}).get("rendered", "")
+                link = post.get("link", "")
                 if "ova" in title.lower():
+                    anime_name = re.sub(r"\s+English\s+(Sub|Dub).*$", "", title).strip()
                     slug = self._title_to_slug(anime_name)
 
                     results.append({
@@ -626,7 +691,9 @@ class AniwatchAPI:
             results = []
             for post in posts:
                 title = post.get("title", {}).get("rendered", "")
+                link = post.get("link", "")
                 if title and title[0].upper() == letter.upper():
+                    anime_name = re.sub(r"\s+English\s+(Sub|Dub).*$", "", title).strip()
                     slug = self._title_to_slug(anime_name)
 
                     results.append({
@@ -663,6 +730,9 @@ class AniwatchAPI:
             posts = resp.json()
             results = []
             for post in posts:
+                title = post.get("title", {}).get("rendered", "")
+                link = post.get("link", "")
+                anime_name = re.sub(r"\s+English\s+(Sub|Dub).*$", "", title).strip()
                 slug = self._title_to_slug(anime_name)
 
                 results.append({
